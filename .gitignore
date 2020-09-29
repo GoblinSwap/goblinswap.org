@@ -1,0 +1,7 @@
+node_modules
+.idea
+/dist
+/dist_electron
+/wallet_web_log
+/src/config.js
+/yarn.lock
