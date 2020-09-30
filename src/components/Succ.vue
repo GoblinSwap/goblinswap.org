@@ -8,7 +8,8 @@
       <div class="account_dialog">
         <div  class="dialog_head">
           <div class="dialog_title" v-if="succType==1">{{this.$t('swap.swap7')}} {{lockNum}} NULS</div>
-          <div class="dialog_title" v-else-if="succType==2">{{this.$t('swap.swap8')}} {{rewardNum}} GOBLIN</div>
+          <div class="dialog_title" v-else-if="succType==3">{{this.$t('swap.swap62')}} {{unlockNum}} NULS</div>
+          <div class="dialog_title" v-else-if="succType==2">{{this.$t('swap.swap8')}} GOBLIN</div>
           <div class="dialog_close" @click="btnDialogClose"><i class="el-icon-close"></i></div>
         </div>
         <div class="succ_view">
@@ -29,6 +30,7 @@ export default {
       succType:0,
       lockNum:0,
       rewardNum:0,
+      unlockNum:0,
       href: "",
       hash:"",
     };
@@ -37,11 +39,14 @@ export default {
     this.succType = localStorage.getItem("succType");
     this.lockNum = localStorage.getItem("lockNum");
     this.rewardNum = localStorage.getItem("rewardNum");
+    this.unlockNum = localStorage.getItem("unlockNum");
      if(this.succType==1){
        this.href = "https://nulscan.io/transaction/info?hash="+localStorage.getItem("lockHash");
      }else if(this.succType==2){
       this.href = "https://nulscan.io/transaction/info?hash="+localStorage.getItem("hash");
-    }
+     }else if(this.succType==3){
+      this.href = "https://nulscan.io/transaction/info?hash="+localStorage.getItem("unlockHash");
+     }
   },
   methods: {
     btnDialogClose(){

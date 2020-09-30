@@ -44,9 +44,14 @@ export default {
       pass:"",
       checkPass:"",
       prefix:"",
+      addressContract:"",
+      
     };
   },
   mounted() {
+    this.$nextTick(function () {
+      this.addressContract = this.$store.getters.getAddressContract;
+    });
   },
   methods: {
     btnDialogClose(){
@@ -91,9 +96,8 @@ export default {
       localStorageByAddressInfo(keyAddressInfo);
       //this.$emit("dialogClose",0)
       location.reload();
-      
-      
     },
+    
   },
 };
 </script>

@@ -32,13 +32,14 @@
             <p class="reward_txt">{{this.$t('swap.swap43')}}</p>
             <p class="reward_time">{{this.$t('swap.swap44')}}</p>
           </div>
-          <button class="reward_btn reward_btn_op" :class="isBtnNo?'reward_btn_no':''" v-if="isDrewardTime" @click="btnReward">{{this.$t('swap.swap38')}}</button>
-          <button class="reward_btn reward_btn_op" :class="isBtnNo?'reward_btn_no':''" v-else-if="!isDrewardTime && isDrewardTimeBtn" >{{this.$t('swap.swap55')}}</button>
-          <button class="reward_btn" :class="isBtnNo?'reward_btn_no':''" v-else>{{this.$t('swap.swap38')}}</button>
+          <button class="reward_btn reward_btn_op" :class="isBtnNo?'reward_btn_no':''" v-if="isDrewardTime" @click="btnRewardUnlock">{{this.$t('swap.swap55')}}</button>
+          <button class="reward_btn reward_btn_op reward_btn_no" v-else >{{this.$t('swap.swap38')}}</button>
+          <!-- <button class="reward_btn reward_btn_op">解锁</button>
+          <button class="reward_btn reward_btn_op" @click="btnReward">收获</button> -->
         </div>
       </div>
     </el-dialog>
-    <password-bar v-if="isPass==1" :type="passType" @dialogClose="dialogFatherClose" @passwordSubmitReward="passSubmitReward"  @passwordSubmitLock="passSubmitLock"></password-bar>
+    <password-bar v-if="isPass==1" :type="passType" @dialogClose="dialogFatherClose" @passwordSubmitRewardUnlock="passSubmitRewardUnlock" @passwordSubmitLock="passSubmitLock"></password-bar>
   </div>
 </template>
 
@@ -48,22 +49,21 @@ import sdk from 'nuls-sdk-js/lib/api/sdk'
 import utils from 'nuls-sdk-js/lib/utils/utils'
 import {MAIN_INFO} from '@/config.js'
 import {chainIdNumber,Times,chainID,Plus,getArgs,timesDecimals,timesDecimals0,Division,passwordVerification,Minus,divisionDecimals} from '@/api/util'
-import {inputsOrOutputs,countFee,validateAndBroadcast,getNulsBalance} from '@/api/requestData'
+import {inputsOrOutputs,countFee,validateAndBroadcast,getNulsBalance,} from '@/api/requestData'
 import passwordBar from "../../components/Password"
 export default {
   props:['lockBalance','earned'],
   components:{
     passwordBar
   },
-  data() {  
+  data() {   
     return {
       isPass:0,
       passType:0,
       dialogVisible: true,
       dialogTab:1,
       isBtnNo: true,
-      isDrewardTime:false,//在9月30日12点 true  数量显示，可收获GOBLIN，不可解锁NULS
-      isDrewardTimeBtn:false,  //10月10日中午12点后可以解锁NULS和收获goblin。   解锁功能 未完成
+      isDrewardTime:false,//10月10日中午12点后可以解锁NULS和收获goblin。
       balanceInfo:"",
       accountDetail:"",
       addressContract:"",
@@ -121,19 +121,24 @@ export default {
       this.isBtnNo = false;
     }
   },
+  watch:{
+    earned(){
+      if(this.earned<=0){
+        this.isBtnNo = true;
+      }else {
+        this.isBtnNo = false;
+      }
+    },
+  },
   methods: {
+    
     btnDialogClose(){
       this.$emit("dialogClose",0)
     },
     dialogFatherClose(el){
       this.isPass = el;
     },
-    btnReward(){
-      this.newArgs = getArgs(this.callForm.parameterList);
-      if (this.newArgs.allParameter) {
-        this.imputedContractCallGas(this.accountDetail.address, 0, this.addressContract, "withdraw", "(BigInteger amount) return void", this.newArgs.args)
-      }
-    },
+    //锁仓
     btnLock(){
       if(Number(this.amount)<10){
         this.$message({message: this.$t('swap.transfer13'), type: 'error', duration: 1000});
@@ -145,6 +150,19 @@ export default {
       }
       this.validateContractCall();
     },
+    //收获&解锁
+    btnRewardUnlock(){
+      this.newArgs = getArgs(this.callForm.parameterList);
+      if (this.newArgs.allParameter) {
+        this.imputedContractCallGas(this.accountDetail.address, 0, this.addressContract, "withdraw", "(BigInteger amount) return void", this.newArgs.args,1)
+      }
+    },
+    //只收获
+    btnReward(){
+      this.imputedContractCallGas(this.accountDetail.address, 0, this.addressContract, "getReward", "() return void", [],3)
+    },
+    
+    
     /**
      * 验证调用合约交易
      * @param sender
@@ -179,329 +197,335 @@ export default {
         });
     },
     /**
-       * 预估调用合约交易的gas
-       * @param sender
-       * @param value
-       * @param contractAddress
-       * @param methodName
-       * @param methodDesc
-       * @param args
-       */
-      async imputedContractCallGasLock(sender, value, contractAddress, methodName, methodDesc, args) {
-        return await this.$post('/', 'imputedContractCallGas', [sender, value, contractAddress, methodName, methodDesc, args])
-          .then(async (response) => {
-            if (response.hasOwnProperty("result")) {
-              this.gasInfo.number = response.result.gasLimit;
-              this.transferForm.gas = response.result.gasLimit;
-              this.transferForm.fee = Number(Plus(Number(Division(Number(Times(this.transferForm.gas, this.transferForm.price)), 10000000)), 0.001));
-              this.contractFee = this.transferForm.fee;
-              let contractConstructorArgsTypes = await this.getContractMethodArgsTypes(contractAddress, methodName);
-              if (!contractConstructorArgsTypes.success) {
-                console.log(JSON.stringify(contractConstructorArgsTypes.data));
-                return;
-              }
-              let newArgs = utils.twoDimensionalArray(args, contractConstructorArgsTypes.data);
-              this.contractCallData = {
-                chainId: MAIN_INFO.chainId,
-                sender: sender,
-                contractAddress: contractAddress,
-                value: value,
-                gasLimit: this.transferForm.gas,
-                price: this.transferForm.price,
-                methodName: methodName,
-                methodDesc: methodDesc,
-                args: newArgs
-              };
-              this.passType = 2;
-              this.isPass = 1;
-              
-            } else {
-              this.$message({message: this.$t('call.call4'), type: 'error', duration: 1000});
-            }
-          })
-          .catch((error) => {
-            this.$message({message: this.$t('call.call5') + error, type: 'error', duration: 1000});
-          });
-      },
-      /**
-       *  获取密码框的密码  锁定  Submit
-       * @param password
-       **/
-      async passSubmitLock(password) {
-        this.isPass = 0;
-        let passwordInfo = await passwordVerification(this.accountDetail, password);
-        console.log(passwordInfo)
-        if (!passwordInfo.success) {
-          this.$message({message: this.$t('address.address13'), type: 'error', duration: 3000});
-          return;
-        }
-
-        this.transferDiolog = false;
-        this.transferLoading = true;
-        this.balanceInfo = await this.getNulsBalance(this.assetsInfo.chainId, this.assetsInfo.assetId, this.transferForm.fromAddress);
-        //console.log(this.balanceInfo);
-        this.transferForm.amount = this.amount;
-        let transferInfo = {
-          fromAddress: this.transferForm.fromAddress,
-          toAddress: this.addressContract,
-          assetType: "NULS",
-          amount: Number(timesDecimals0(this.transferForm.amount, this.assetsInfo.decimals)),
-          gas: this.transferForm.gas,
-          price: this.transferForm.price,
-          remarks: this.transferForm.remarks,
-          fee: Number(timesDecimals0(this.transferForm.fee, this.defaultInfo.defaultAsset.decimals)),
-          assetsChainId: this.assetsInfo.chainId,
-          assetsId: this.assetsInfo.assetId,
-        };
-
-        let inOrOutputs = {};
-        let tAssemble = [];
-        let txHex = "";//交易签名
-          this.contractCallData.chainId = MAIN_INFO.chainId;
-          transferInfo.value = Number(transferInfo.amount);
-          transferInfo.amount = Number(Plus(transferInfo.fee, Number(Times(this.transferForm.gas, this.transferForm.price)))).toString();
-          transferInfo.amount = Number(Plus(transferInfo.amount, transferInfo.value)).toString();
-          inOrOutputs = await inputsOrOutputs(transferInfo, this.balanceInfo, 16);
-         tAssemble = await nuls.transactionAssemble(inOrOutputs.data.inputs, inOrOutputs.data.outputs, "", 16, this.contractCallData);
-        
-        txHex = await nuls.transactionSerialize(passwordInfo.pri, passwordInfo.pub, tAssemble);
-        //console.log(txHex);
-        let broadcastResult = await validateAndBroadcast(txHex);
-        console.log(broadcastResult);
-        if (!broadcastResult.success) {
-          this.$message({
-            message: this.$t('tips.tips14') + JSON.stringify(broadcastResult.data),
-            type: 'error',
-            duration: 3000
-          });
-        } else {
-          this.$emit("dialogClose",7);
-          localStorage.setItem("succType",1);
-          localStorage.setItem("lockNum",this.transferForm.amount);
-          localStorage.setItem("lockHash",broadcastResult.hash);
-          this.transferLoading = false;
-        }
-      },
-      /**
-       * 获取地址的资金列表
-       * @param address
-       **/
-      async getCapitalListByAddress(address) {
-        this.transferLoading = true;
-        //获取本连的基本资产
-        let basicAssets = [];
-        let chainId = MAIN_INFO.chainId; //记录主链id
-        await this.$post('/', 'getAccountLedgerList', [address])
-          .then((response) => {
-            //console.log(response.result);
-            if (response.hasOwnProperty("result")) {
-              for (let item of response.result) {
-                basicAssets.push({
-                  type: 1,
-                  symbol: item.symbol,
-                  chainId: item.chainId,
-                  assetId: item.assetId,
-                  balance: timesDecimals(item.balance),
-                  decimals: item.decimals,
-                });
-                chainId = item.chainId;
-              }
-            }
-          })
-          .catch((error) => {
-            console.log("getAccountLedgerList:" + error);
-            this.assetsListLoading = false;
-            setTimeout(() => {
-              //this.getCapitalListByAddress(address)
-            }, 800);
-            return;
-          });
-        ///console.log(basicAssets);
-
-        //获取本连的合约资产
-        let contractAssets = [];
-        await this.$post('/', 'getAccountTokens', [1, 100, address])
-          .then((response) => {
-            //console.log(response);
-            if (response.hasOwnProperty("result")) {
-              for (let itme of response.result.list) {
-                contractAssets.push({
-                  type: 2,
-                  symbol: itme.tokenSymbol,
-                  chainId: chainId,
-                  assetId: 1,
-                  status: itme.status,
-                  // balance: timesDecimals(itme.balance, itme.decimals),
-                  balance: divisionDecimals(Minus(itme.balance, itme.lockedBalance), itme.decimals),
-                  contractAddress: itme.contractAddress,
-                  decimals: itme.decimals
-                })
-              }
-            }
-          })
-          .catch((error) => {
-            console.log("getAccountTokens:" + error);
-            setTimeout(() => {
-              //this.getCapitalListByAddress(address)
-            }, 800);
-            return;
-          });
-
-        const newContractAssets = contractAssets.filter(obj => obj.status !== 3); //隐藏已经删除合约
-        //console.log(contractAssets);
-
-        //获取跨链的基本资产
-        let crossAssets = [];
-        await this.$post('/', 'getAccountCrossLedgerList', [address])
-          .then((response) => {
-            //console.log(response);
-            if (response.hasOwnProperty("result")) {
-              for (let item of response.result) {
-                crossAssets.push({
-                  type: 1,
-                  symbol: item.symbol,
-                  chainId: item.chainId,
-                  assetId: item.assetId,
-                  balance: timesDecimals(item.balance, item.decimals),
-                  decimals: item.decimals
-                })
-              }
-            }
-          })
-          .catch((err) => {
-            console.log("getAccountCrossLedgerList:" + err);
-            setTimeout(() => {
-              // this.getCapitalListByAddress(address)
-            }, 800);
-            return;
-          });
-        //console.log(crossAssets);
-
-        this.assetsList = [...basicAssets, ...newContractAssets, ...crossAssets];
-
-        //console.log(this.$route.query.accountType);
-        let newInfo = this.$route.query.accountType ? this.$route.query.accountType : {type: 1, tokenSymbol: MAIN_INFO};
-        if (this.$route.query.accountType === 'NULS') {
-          newInfo = {type: 1, tokenSymbol: MAIN_INFO};
-          newInfo.tokenSymbol.symbol = 'NULS';
-        }
-        if (!newInfo.contractAddress && !newInfo.tokenSymbol.symbol) {
-          newInfo.tokenSymbol.symbol = 'NULS';
-        }
-        if (newInfo.contractAddress) {
-          newInfo.symbol = newInfo.tokenSymbol;
-          newInfo.tokenSymbol = newInfo;
-        }
-        //console.log(newInfo);
-
-        for (let item of this.assetsList) {
-          //console.log(item);
-          if (item.type === 1) {
-            if (item.assetId === newInfo.tokenSymbol.assetId && item.chainId === newInfo.tokenSymbol.chainId) {
-              this.changeType(item);
-              this.transferLoading = false;
-              return
-            }
-          } else {
-            if (item.contractAddress && item.contractAddress === newInfo.contractAddress) {
-              this.changeType(item);
-              this.transferLoading = false;
+     * 预估调用合约交易的gas
+     * @param sender
+     * @param value
+     * @param contractAddress
+     * @param methodName
+     * @param methodDesc
+     * @param args
+     */
+    async imputedContractCallGasLock(sender, value, contractAddress, methodName, methodDesc, args) {
+      return await this.$post('/', 'imputedContractCallGas', [sender, value, contractAddress, methodName, methodDesc, args])
+        .then(async (response) => {
+          if (response.hasOwnProperty("result")) {
+            this.gasInfo.number = response.result.gasLimit;
+            this.transferForm.gas = response.result.gasLimit;
+            this.transferForm.fee = Number(Plus(Number(Division(Number(Times(this.transferForm.gas, this.transferForm.price)), 10000000)), 0.001));
+            this.contractFee = this.transferForm.fee;
+            let contractConstructorArgsTypes = await this.getContractMethodArgsTypes(contractAddress, methodName);
+            if (!contractConstructorArgsTypes.success) {
+              console.log(JSON.stringify(contractConstructorArgsTypes.data));
               return;
             }
-          }
-        }
-        this.transferLoading = false;
-      },
-      /**
-       * 资产类型选择
-       * @param type
-       **/
-      async changeType(type) {
-        //console.log(type);
-        this.assetsInfo = type;
-        this.transferForm.assetType = type.symbol;
-        this.parameterValidation();
-        if (this.transferForm.amount !== '') {
-          this.$refs.transferForm.validateField('amount');
-        }
-      },
-      /**
-       * @disc: 参数验证
-       * @params:
-       * @date: 2020-07-02 14:21
-       * @author: Wave
-       */
-      parameterValidation() {
-        if (this.transferForm.toAddress && this.transferForm.amount) {
-          if (this.assetsInfo.type === 1) { //主链资产
-            if (this.toAddressInfo.type === 2) { //合约地址
-              if (this.assetsInfo.chainId === MAIN_INFO.chainId && this.assetsInfo.assetId === MAIN_INFO.assetId) {
-                this.toAddressInfo.transferType = 3; //3：向合约地址转NULS
-                this.transferPayable();
-              } else {
-                this.toAddressInfo.amount = '';
-                this.$message({message: this.$t('transfer.transfer25'), type: 'error', duration: 3000});
-              }
-            }
-          } else { //合约资产
-            if (this.toAddressInfo.type === 1) { //普通地址
-              this.toAddressInfo.transferType = 2; // 2：token转账
-            } else { //合约地址
-              this.toAddressInfo.transferType = 4; // 4：向合约地址转token
-            }
-            this.transferTransfer();
-          }
-        }
-      },
-      /**
-       * 获取转出地址余额信息
-       *  @param assetChainId
-       *  @param assetId
-       *  @param address
-       **/
-      async getNulsBalance(assetChainId, assetId, address) {
-        try {
-          let resData = await getNulsBalance(assetChainId, assetId, address);
-          //console.log(resData);
-          if (resData.success) {
-            return resData.data
+            let newArgs = utils.twoDimensionalArray(args, contractConstructorArgsTypes.data);
+            this.contractCallData = {
+              chainId: MAIN_INFO.chainId,
+              sender: sender,
+              contractAddress: contractAddress,
+              value: value,
+              gasLimit: this.transferForm.gas,
+              price: this.transferForm.price,
+              methodName: methodName,
+              methodDesc: methodDesc,
+              args: newArgs
+            };
+            this.passType = 2;
+            this.isPass = 1;
+            
           } else {
-            return {}
+            this.$message({message: this.$t('call.call4'), type: 'error', duration: 1000});
           }
-        } catch (error) {
-          console.log(error);
+        })
+        .catch((error) => {
+          this.$message({message: this.$t('call.call5') + error, type: 'error', duration: 1000});
+        });
+    },
+    /**
+     *  获取密码框的密码  锁仓--Submit
+     * @param password
+     **/
+    async passSubmitLock(password) {
+      this.isPass = 0;
+      let passwordInfo = await passwordVerification(this.accountDetail, password);
+      console.log(passwordInfo)
+      if (!passwordInfo.success) {
+        this.$message({message: this.$t('address.address13'), type: 'error', duration: 3000});
+        return;
+      }
+
+      this.transferDiolog = false;
+      this.transferLoading = true;
+      this.balanceInfo = await this.getNulsBalance(this.assetsInfo.chainId, this.assetsInfo.assetId, this.transferForm.fromAddress);
+      //console.log(this.balanceInfo);
+      this.transferForm.amount = this.amount;
+      let transferInfo = {
+        fromAddress: this.transferForm.fromAddress,
+        toAddress: this.addressContract,
+        assetType: "NULS",
+        amount: Number(timesDecimals0(this.transferForm.amount, this.assetsInfo.decimals)),
+        gas: this.transferForm.gas,
+        price: this.transferForm.price,
+        remarks: this.transferForm.remarks,
+        fee: Number(timesDecimals0(this.transferForm.fee, this.defaultInfo.defaultAsset.decimals)),
+        assetsChainId: this.assetsInfo.chainId,
+        assetsId: this.assetsInfo.assetId,
+      };
+
+      let inOrOutputs = {};
+      let tAssemble = [];
+      let txHex = "";//交易签名
+        this.contractCallData.chainId = MAIN_INFO.chainId;
+        transferInfo.value = Number(transferInfo.amount);
+        transferInfo.amount = Number(Plus(transferInfo.fee, Number(Times(this.transferForm.gas, this.transferForm.price)))).toString();
+        transferInfo.amount = Number(Plus(transferInfo.amount, transferInfo.value)).toString();
+        inOrOutputs = await inputsOrOutputs(transferInfo, this.balanceInfo, 16);
+        tAssemble = await nuls.transactionAssemble(inOrOutputs.data.inputs, inOrOutputs.data.outputs, "", 16, this.contractCallData);
+      
+      txHex = await nuls.transactionSerialize(passwordInfo.pri, passwordInfo.pub, tAssemble);
+      //console.log(txHex);
+      let broadcastResult = await validateAndBroadcast(txHex);
+      console.log(broadcastResult);
+      if (!broadcastResult.success) {
+        this.$message({
+          message: this.$t('error.lg_1004') + JSON.stringify(broadcastResult.data),
+          type: 'error',
+          duration: 3000
+        });
+      } else {
+        this.$emit("dialogClose",7);
+        localStorage.setItem("succType",1);
+        localStorage.setItem("lockNum",this.transferForm.amount);
+        localStorage.setItem("lockHash",broadcastResult.hash);
+        this.transferLoading = false;
+      }
+    },
+    /**
+     * 获取地址的资金列表
+     * @param address
+     **/
+    async getCapitalListByAddress(address) {
+      this.transferLoading = true;
+      //获取本连的基本资产
+      let basicAssets = [];
+      let chainId = MAIN_INFO.chainId; //记录主链id
+      await this.$post('/', 'getAccountLedgerList', [address])
+        .then((response) => {
+          //console.log(response.result);
+          if (response.hasOwnProperty("result")) {
+            for (let item of response.result) {
+              basicAssets.push({
+                type: 1,
+                symbol: item.symbol,
+                chainId: item.chainId,
+                assetId: item.assetId,
+                balance: timesDecimals(item.balance),
+                decimals: item.decimals,
+              });
+              chainId = item.chainId;
+            }
+          }
+        })
+        .catch((error) => {
+          console.log("getAccountLedgerList:" + error);
+          this.assetsListLoading = false;
+          setTimeout(() => {
+            //this.getCapitalListByAddress(address)
+          }, 800);
+          return;
+        });
+      ///console.log(basicAssets);
+
+      //获取本连的合约资产
+      let contractAssets = [];
+      await this.$post('/', 'getAccountTokens', [1, 100, address])
+        .then((response) => {
+          //console.log(response);
+          if (response.hasOwnProperty("result")) {
+            for (let itme of response.result.list) {
+              contractAssets.push({
+                type: 2,
+                symbol: itme.tokenSymbol,
+                chainId: chainId,
+                assetId: 1,
+                status: itme.status,
+                // balance: timesDecimals(itme.balance, itme.decimals),
+                balance: divisionDecimals(Minus(itme.balance, itme.lockedBalance), itme.decimals),
+                contractAddress: itme.contractAddress,
+                decimals: itme.decimals
+              })
+            }
+          }
+        })
+        .catch((error) => {
+          console.log("getAccountTokens:" + error);
+          setTimeout(() => {
+            //this.getCapitalListByAddress(address)
+          }, 800);
+          return;
+        });
+
+      const newContractAssets = contractAssets.filter(obj => obj.status !== 3); //隐藏已经删除合约
+      //console.log(contractAssets);
+
+      //获取跨链的基本资产
+      let crossAssets = [];
+      await this.$post('/', 'getAccountCrossLedgerList', [address])
+        .then((response) => {
+          //console.log(response);
+          if (response.hasOwnProperty("result")) {
+            for (let item of response.result) {
+              crossAssets.push({
+                type: 1,
+                symbol: item.symbol,
+                chainId: item.chainId,
+                assetId: item.assetId,
+                balance: timesDecimals(item.balance, item.decimals),
+                decimals: item.decimals
+              })
+            }
+          }
+        })
+        .catch((err) => {
+          console.log("getAccountCrossLedgerList:" + err);
+          setTimeout(() => {
+            // this.getCapitalListByAddress(address)
+          }, 800);
+          return;
+        });
+      //console.log(crossAssets);
+
+      this.assetsList = [...basicAssets, ...newContractAssets, ...crossAssets];
+
+      //console.log(this.$route.query.accountType);
+      let newInfo = this.$route.query.accountType ? this.$route.query.accountType : {type: 1, tokenSymbol: MAIN_INFO};
+      if (this.$route.query.accountType === 'NULS') {
+        newInfo = {type: 1, tokenSymbol: MAIN_INFO};
+        newInfo.tokenSymbol.symbol = 'NULS';
+      }
+      if (!newInfo.contractAddress && !newInfo.tokenSymbol.symbol) {
+        newInfo.tokenSymbol.symbol = 'NULS';
+      }
+      if (newInfo.contractAddress) {
+        newInfo.symbol = newInfo.tokenSymbol;
+        newInfo.tokenSymbol = newInfo;
+      }
+      //console.log(newInfo);
+
+      for (let item of this.assetsList) {
+        //console.log(item);
+        if (item.type === 1) {
+          if (item.assetId === newInfo.tokenSymbol.assetId && item.chainId === newInfo.tokenSymbol.chainId) {
+            this.changeType(item);
+            this.transferLoading = false;
+            return
+          }
+        } else {
+          if (item.contractAddress && item.contractAddress === newInfo.contractAddress) {
+            this.changeType(item);
+            this.transferLoading = false;
+            return;
+          }
+        }
+      }
+      this.transferLoading = false;
+    },
+    /**
+     * 资产类型选择
+     * @param type
+     **/
+    async changeType(type) {
+      //console.log(type);
+      this.assetsInfo = type;
+      this.transferForm.assetType = type.symbol;
+      this.parameterValidation();
+      if (this.transferForm.amount !== '') {
+        this.$refs.transferForm.validateField('amount');
+      }
+    },
+    /**
+     * @disc: 参数验证
+     * @params:
+     * @date: 2020-07-02 14:21
+     * @author: Wave
+     */
+    parameterValidation() {
+      if (this.transferForm.toAddress && this.transferForm.amount) {
+        if (this.assetsInfo.type === 1) { //主链资产
+          if (this.toAddressInfo.type === 2) { //合约地址
+            if (this.assetsInfo.chainId === MAIN_INFO.chainId && this.assetsInfo.assetId === MAIN_INFO.assetId) {
+              this.toAddressInfo.transferType = 3; //3：向合约地址转NULS
+              this.transferPayable();
+            } else {
+              this.toAddressInfo.amount = '';
+              this.$message({message: this.$t('transfer.transfer25'), type: 'error', duration: 3000});
+            }
+          }
+        } else { //合约资产
+          if (this.toAddressInfo.type === 1) { //普通地址
+            this.toAddressInfo.transferType = 2; // 2：token转账
+          } else { //合约地址
+            this.toAddressInfo.transferType = 4; // 4：向合约地址转token
+          }
+          this.transferTransfer();
+        }
+      }
+    },
+    /**
+     * 获取转出地址余额信息
+     *  @param assetChainId
+     *  @param assetId
+     *  @param address
+     **/
+    async getNulsBalance(assetChainId, assetId, address) {
+      try {
+        let resData = await getNulsBalance(assetChainId, assetId, address);
+        //console.log(resData);
+        if (resData.success) {
+          return resData.data
+        } else {
           return {}
         }
-      },
-      /**
-       * 查询账户详情根据别名
-       * @param alias
-       **/
-      async getAccountByAlias(alias) {
-        try {
-          let resData = await this.$post('/', 'getAccountByAlias', [alias]);
-          //console.log(resData);
-          if (resData.hasOwnProperty("result")) {
-            this.aliasToAddress = resData.result.address;
-            this.toAddressInfo = nuls.verifyAddress(this.aliasToAddress);
-            if (this.toAddressInfo.type === 1) { //主链地址
-              await this.verifyToAddress();
-            }
-            return {success: true}
-          } else {
-            this.aliasToAddress = '';
-            return {success: false}
+      } catch (error) {
+        console.log(error);
+        return {}
+      }
+    },
+    /**
+     * 查询账户详情根据别名
+     * @param alias
+     **/
+    async getAccountByAlias(alias) {
+      try {
+        let resData = await this.$post('/', 'getAccountByAlias', [alias]);
+        //console.log(resData);
+        if (resData.hasOwnProperty("result")) {
+          this.aliasToAddress = resData.result.address;
+          this.toAddressInfo = nuls.verifyAddress(this.aliasToAddress);
+          if (this.toAddressInfo.type === 1) { //主链地址
+            await this.verifyToAddress();
           }
-        } catch (err) {
-          console.log(err);
+          return {success: true}
+        } else {
+          this.aliasToAddress = '';
           return {success: false}
         }
-      },
+      } catch (err) {
+        console.log(err);
+        return {success: false}
+      }
+    },
+
+
+
+
+
+
 
     /**
-     * 收获  Submit
+     * 挖礦收益   收获Submit
      **/
-    async passSubmitReward(password){
+    async passSubmitRewardUnlock(password){
       this.isPass = 0;
       const pri = nuls.decrypteOfAES(this.accountDetail.aesPri, password);
       const newAddressInfo = nuls.importByKey(chainID(), pri, password, this.prefix);
@@ -545,7 +569,6 @@ export default {
               this.callResult = response
               this.$emit("dialogClose",7);
               localStorage.setItem("succType",2);
-              localStorage.setItem("rewardNum",timesDecimals(amount));
               localStorage.setItem("hash",response.hash);
             } else {
               if (response.data.code === 'err_0014') {
@@ -573,7 +596,6 @@ export default {
         //console.log(response);
         if (response.success) {
           this.balanceInfo = response.data;
-          
         } else {
           this.$message({message: this.$t('public.err2') + response, type: 'error', duration: 3000});
         }
@@ -583,7 +605,7 @@ export default {
     },
     
     /**
-     * 预估调用合约交易的gas  （收获）
+     * 预估调用合约交易的gas  
      * @param sender
      * @param value
      * @param contractAddress
@@ -591,7 +613,7 @@ export default {
      * @param methodDesc
      * @param args
      */
-    async imputedContractCallGas(sender, value, contractAddress, methodName, methodDesc, args) {
+    async imputedContractCallGas(sender, value, contractAddress, methodName, methodDesc, args,btnType) {
       return await this.$post('/', 'imputedContractCallGas', [sender, value, contractAddress, methodName, methodDesc, args])
         .then(async (response) => {
           //console.log(response);
@@ -615,7 +637,7 @@ export default {
               methodDesc: methodDesc,
               args: newArgs
             };
-            this.passType = 1;
+            this.passType = btnType;
             this.isPass = 1;
             
           } else {

@@ -43,9 +43,13 @@ export default {
         return false;
       }
       if(this.type==1){
-        this.$emit('passwordSubmitReward', this.pass);
+        this.$emit('passwordSubmitRewardUnlock', this.pass);
       }else if(this.type==2){
         this.$emit('passwordSubmitLock', this.pass);
+      }else if(this.type==3){
+        this.$emit('passwordSubmitRewardUnlock', this.pass);
+      }else if(this.type==4){
+        this.$emit('passSubmitUnLockOld', this.pass);
       }
       
     },

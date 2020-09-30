@@ -1161,6 +1161,10 @@ const en = {
     "swap56": "Fail to import private key, please try again.",
     "swap57": "Fast connect",
     "swap58": "NULS connect",
+    "swap59": "Tips",
+    "swap60": "Please unlock ",
+    "swap61": "NULS for the upgrade of  smart contract. we will transfer Goblin to you in 24 hours.",
+    "swap62": "Unlock",
   },
 
   ...enLocale

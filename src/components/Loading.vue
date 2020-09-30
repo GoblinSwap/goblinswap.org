@@ -8,7 +8,8 @@
       <div class="account_dialog">
         <div  class="dialog_head">
           <div class="dialog_title" v-if="succType==1">{{this.$t('swap.swap7')}} {{lockNum}} NULS</div>
-          <div class="dialog_title" v-else-if="succType==2">{{this.$t('swap.swap8')}} {{rewardNum}} GOBLIN</div>
+          <div class="dialog_title" v-else-if="succType==3">{{this.$t('swap.swap62')}} {{unlockNum}} NULS</div>
+          <div class="dialog_title" v-else-if="succType==2">{{this.$t('swap.swap8')}} GOBLIN</div>
           <div class="dialog_close" @click="btnDialogClose"><i class="el-icon-close"></i></div>
         </div>
         <div class="succ_view">
@@ -28,6 +29,7 @@ export default {
       succType:0,
       lockNum:0,
       rewardNum:0,
+      unlockNum:0,
       setIntervalResult:null,
       hash:"",
     };
@@ -36,7 +38,7 @@ export default {
     let that = this;
     this.succType = localStorage.getItem("succType");
     this.lockNum = localStorage.getItem("lockNum");
-    this.rewardNum = localStorage.getItem("rewardNum");
+    this.unlockNum = localStorage.getItem("unlockNum");
     if(this.succType==1){
       this.hash = localStorage.getItem("lockHash");
       this.setIntervalResult = setInterval(function(){
@@ -44,6 +46,11 @@ export default {
       },3000)
     }else if(this.succType==2){
       this.hash = localStorage.getItem("hash");
+      this.setIntervalResult = setInterval(function(){
+        that.getResult();
+      },3000)
+    }else if(this.succType==3){
+      this.hash = localStorage.getItem("unlockHash");
       this.setIntervalResult = setInterval(function(){
         that.getResult();
       },3000)
@@ -60,14 +67,10 @@ export default {
           if (response.hasOwnProperty("result")) {
             if(this.hash==response.result.txHash){
               clearInterval(this.setIntervalResult);
-              this.$emit("dialogClose",8);
               if(this.succType==1){
                 localStorage.setItem("lockNum",this.lockNum);
-              }else if(this.succType==2){
-                localStorage.setItem("rewardNum",this.rewardNum);
               }
-
-              
+              this.$emit("dialogClose",8);
             }
           }
         })

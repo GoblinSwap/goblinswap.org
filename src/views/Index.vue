@@ -49,10 +49,12 @@
     <loading-bar v-if="dialogType==7" @dialogClose="dialogFatherClose"></loading-bar>
     <!-- 成功提示框 -->
     <succ-bar v-if="dialogType==8" @dialogClose="dialogFatherClose"></succ-bar>
+    <!-- 旧合约->新合约  解锁&获取 -->
+    <account-transfer v-if="dialogType==9" @dialogClose="dialogFatherClose"></account-transfer>
   </div>
 </template>
 <script>
-import {chainIdNumber,timesDecimals,divisionDecimals} from '@/api/util'
+import {chainIdNumber,timesDecimals,divisionDecimals,thousands} from '@/api/util'
 import accountCreate from "./account/AccountCreate"
 import accountImport from "./account/AccountImport"
 import accountBackup from "./account/AccountBackup"
@@ -61,6 +63,7 @@ import lockDialog from "./lock/LockDialog"
 import passwordBar from "../components/Password"
 import loadingBar from "../components/Loading"
 import succBar from "../components/Succ"
+import accountTransfer from "./account/AccountTransfer"
 export default {
   components: {
     accountCreate,
@@ -70,7 +73,8 @@ export default {
     lockDialog,
     passwordBar,
     loadingBar,
-    succBar
+    succBar,
+    accountTransfer
   },
   data() {
     return {
@@ -81,6 +85,8 @@ export default {
       lockBalance:"",
       earned:"",
       isStart:true,//在9月29日开启  true
+      addressContractOld:"NULSd6Hgs5jWne1wiyESyJRgRJYnWTkUMi1jx",
+      // list:["NULSd6Hge7CyGtPWVmqAAGSWsMEUdZHgXvV8N"],
     };
   },
   mounted() {
@@ -94,12 +100,42 @@ export default {
         if(that.accountDetail){
           that.getBalanceOf();
           that.getEarned();
+          that.getBalanceOfOld(that.accountDetail.address);
         }
+        setInterval(function(){
+          that.getTotalSupply();
+          if(that.accountDetail){
+            that.getBalanceOf();
+            that.getEarned();
+          }
+        },10000)
       },600)
+      
     });
     
   },
   methods: {
+    /**
+     * 已锁定
+     **/
+    getBalanceOfOld(address){
+      this.$post('/', 'invokeView', [this.addressContractOld,'balanceOf','(Address account) return BigInteger',[address]])
+        .then((response) => {
+          if (response.hasOwnProperty("result")) {
+             let lockBalance = timesDecimals(response.result.result);
+             console.log(lockBalance)
+             if(lockBalance>0){
+               localStorage.setItem("lockBalanceOld",lockBalance)
+               this.dialogType = 9
+             }
+            } else {
+              this.$message({message: this.$t('call.call4') + response.error.message, type: 'error', duration: 3000});
+            }
+        })
+        .catch((error) => {
+          this.$message({message: this.$t('call.call5') + JSON.stringify(error), type: 'error', duration: 3000});
+        });
+    },
     dialogCreate(){
       this.dialogType = 1;
     },
@@ -116,7 +152,7 @@ export default {
       this.$post('/', 'invokeView', [this.addressContract,'totalSupply','() return BigInteger',[]])
         .then((response) => {
           if (response.hasOwnProperty("result")) {
-             this.total = timesDecimals(response.result.result);
+             this.total = thousands(timesDecimals(response.result.result));
             } else {
               this.$message({message: this.$t('call.call4') + response.error.message, type: 'error', duration: 3000});
             }
@@ -158,6 +194,7 @@ export default {
           this.$message({message: this.$t('call.call5') + JSON.stringify(error), type: 'error', duration: 3000});
         });
     },
+
   },
 };
 </script>

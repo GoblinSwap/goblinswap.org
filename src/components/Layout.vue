@@ -57,7 +57,7 @@ export default {
   },
   data () {
     return {
-      lang: localStorage.getItem("lang") || 'en', //语言选择
+      lang: localStorage.getItem("lang") || 'cn', //语言选择
       showDialogId:0,
       accountDetail:"",
       addressList: [], //地址列表
@@ -67,12 +67,12 @@ export default {
     }
   },
   created() {
-      localStorage.setItem("lang",this.lang?this.lang:'en')
+      localStorage.setItem("lang",this.lang?this.lang:'cn')
       this.serviceUrls = {};
       let newUrlData = this.$store.getters.getUrlData;
       this.serviceUrls = newUrlData.filter(item => item.selection)[0];
       localStorage.setItem('url', JSON.stringify(this.serviceUrls));
-      this.getHeaderInfo();
+      
       setInterval(() => {
         let newUrlData = this.$store.getters.getUrlData;
         this.serviceUrls = newUrlData.filter(item => item.selection)[0];
@@ -85,6 +85,7 @@ export default {
       let chain = localStorage.getItem(chainIdNumber());
       this.accountDetail = chain?JSON.parse(chain)[0]:"";
       setTimeout(function(){
+        that.getHeaderInfo();
         that.getAddressInfo();
         setInterval(function(){
           that.getHeaderInfo();
@@ -114,6 +115,7 @@ export default {
     btnBackup(){
       this.$refs.child.dialogDetail();
     },
+    
     /**
      * 获取主网最新高度和本地高度
      */

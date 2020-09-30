@@ -7,7 +7,7 @@ export default new Vuex.Store({
   state: {
     addressInfo: {},
     urlData: [],
-    addressContract:"NULSd6Hgs5jWne1wiyESyJRgRJYnWTkUMi1jx",
+    addressContract:"NULSd6HgzUdqytHqAqyZjDfFvUSbbcXafgPVk",
   },
   mutations: {
     setAddressInfo(state, data) {
